@@ -104,7 +104,6 @@ def detect(video_path, frames=None):
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return None
-    model_name = os.environ.get("GEMINI_MODEL") or 'gemini-3.1-flash-lite'
     try:
         from google import genai
         from google.genai import types as genai_types
@@ -112,6 +111,8 @@ def detect(video_path, frames=None):
 
         import gemini_worker
         import layout_picker
+
+        model_name = gemini_worker.configured_model()
 
         class FrameSubtitle(BaseModel):
             frame: int
@@ -126,7 +127,8 @@ def detect(video_path, frames=None):
         client = genai.Client(api_key=api_key)
         parts = [genai_types.Part.from_bytes(data=b, mime_type="image/jpeg")
                  for b in frames]
-        response = client.models.generate_content(
+        response = gemini_worker.generate_content(
+            client,
             model=model_name,
             contents=parts + [PROMPT],
             config=genai_types.GenerateContentConfig(

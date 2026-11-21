@@ -128,9 +128,10 @@ def _ask_gemini(frames, prompt, api_key):
     import gemini_worker
 
     client = genai.Client(api_key=api_key)
-    model_name = os.environ.get("GEMINI_MODEL") or "gemini-3.1-flash-lite"
+    model_name = gemini_worker.configured_model()
     parts = [genai_types.Part.from_bytes(data=b, mime_type="image/jpeg") for b in frames]
-    response = client.models.generate_content(
+    response = gemini_worker.generate_content(
+        client,
         model=model_name,
         contents=parts + [prompt],
         config=genai_types.GenerateContentConfig(

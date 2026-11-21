@@ -1,5 +1,13 @@
 # Clip selection
 
+The moment picker calls `GEMINI_MODEL`, default `gemini-3.5-flash-lite`
+(`clip_selection.DEFAULT_GEMINI_MODEL`). A new API key is refused older ids
+(`gemini-2.5-flash`, and `gemini-3.1-flash-lite` once Google closes it to keys
+that never used it) with HTTP 404 "no longer available to new users".
+`gemini_worker.generate_content` retries that call once on the current default
+and stays there for the rest of the process. Image generation does not take
+that fallback. Titles stay on `GEMINI_MODEL_THUMBNAIL` (`gemini-3.8-flash`).
+
 ## How many clips a job returns (`clip_selection.py`, `main.get_viral_clips`)
 
 The count is not a setting, it is derived. `get_viral_clips` builds ~90 s scoring

@@ -6,8 +6,21 @@ the logic stays unit-testable without the heavy video dependencies.
 """
 import math
 
+# Moment picker, layouts and hooks. Older ids (gemini-2.5-flash, and
+# gemini-3.1-flash-lite once a key has never called it) answer new API keys
+# with 404 "no longer available to new users". Google's replacement for both
+# is gemini-3.5-flash-lite; a refused id is retried on this one.
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
+# Titles, descriptions, thumbnail concepts. Flash-lite is worse at that copy.
+# gemini-3.7-flash is no longer selectable and routes to this id.
+DEFAULT_GEMINI_TEXT_MODEL = "gemini-3.8-flash"
+
 # USD per 1M tokens (input, output incl. thinking), from ai.google.dev pricing.
+# gemini-3.8-flash is the introductory rate through 2026-12-31; the published
+# standard rate from 2027-01-01 is (1.50, 7.50).
 MODEL_PRICES = {
+    "gemini-3.8-flash": (0.75, 3.75),
+    "gemini-3.5-flash-lite": (0.30, 2.50),
     "gemini-3.5-flash": (1.50, 9.00),
     "gemini-3.1-flash-lite": (0.25, 1.50),
     "gemini-3-flash-preview": (0.50, 3.00),
@@ -25,6 +38,27 @@ def lookup_model_prices(model_name):
         if name.startswith(key) and (best_key is None or len(key) > len(best_key)):
             best_key = key
     return MODEL_PRICES[best_key] if best_key else None
+
+
+def model_unavailable(message) -> bool:
+    """True when Gemini refused the model id, not the request.
+
+    A new API key gets HTTP 404 ``no longer available to new users`` for an id
+    it has never called. A shutdown reads ``is not found for API version`` /
+    ``not supported for generateContent``. A 404 for a missing uploaded file
+    does not match, so it is not retried on another model.
+    """
+    text = str(message or "")
+    low = text.lower()
+    if "404" not in text and "not_found" not in low:
+        return False
+    if "no longer available" in low:
+        return True
+    if "not supported for generatecontent" in low:
+        return True
+    if "is not found for api version" in low:
+        return True
+    return "models/" in low and "not found" in low
 
 
 def clip_count_targets(n_windows):

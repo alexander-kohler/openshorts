@@ -203,7 +203,6 @@ def pick(video_path, video_duration):
     if not api_key:
         return "none"
 
-    model_name = os.environ.get("GEMINI_MODEL") or 'gemini-3.1-flash-lite'
     print("🎛️  Choosing a layout for this video…")
     try:
         # Inside the try on purpose: the contract above is that this never
@@ -212,6 +211,7 @@ def pick(video_path, video_duration):
         from google.genai import types as genai_types
         import gemini_worker
 
+        model_name = gemini_worker.configured_model()
         frames = sample_frames(video_path)
         if not frames:
             print("   ⚠️ No readable frames — keeping the default layout.")
@@ -220,7 +220,8 @@ def pick(video_path, video_duration):
         client = genai.Client(api_key=api_key)
         parts = [genai_types.Part.from_bytes(data=b, mime_type="image/jpeg")
                  for b in frames]
-        response = client.models.generate_content(
+        response = gemini_worker.generate_content(
+            client,
             model=model_name,
             contents=parts + [gemini_worker.LAYOUT_CHOICE_PROMPT],
             config=genai_types.GenerateContentConfig(

@@ -567,7 +567,7 @@ const freeClipGenerator = () => ({
   lede: `OpenShorts is a free, open source AI clip generator: free with no watermark and no cap when you self-host it (MIT), or in the browser with your first video clipped free up to 60 minutes (watermarked, no card) and no watermark from $${CLOUD.lowPrice}/month for ${STARTER.monthly.minutes} minutes.`,
   tldr: [
     'OpenShorts self-hosted is a free AI clip generator under the MIT licence. No watermark, no usage cap, no subscription. You run it with Docker and supply your own Google Gemini API key, whose free tier covers 1,500 requests a day.',
-    'It turns a long video into 3 to 15 vertical clips: faster-whisper transcribes at word level, PySceneDetect finds the cuts, Gemini 3.1 Flash-Lite scores the moments, and MediaPipe face tracking reframes each one to 9:16.',
+    'It turns a long video into 3 to 15 vertical clips: faster-whisper transcribes at word level, PySceneDetect finds the cuts, Gemini 3.5 Flash-Lite scores the moments, and MediaPipe face tracking reframes each one to 9:16.',
     'If you do not want to run anything, OpenShorts Cloud is a free AI clipping tool in the browser: your first video is clipped whole up to 60 minutes, then 20 free minutes a month, with a watermark. Paid plans from $12/month remove it, also from the clips you already made.',
     'So the short answer to "free, with no watermark": yes when you self-host, yes on any paid Cloud plan, and no on the free Cloud plan. A hosted tool that claims free, unlimited and unwatermarked at once is making one of the three claims temporarily.',
   ],
@@ -653,7 +653,7 @@ and a 9:16 converter with no account at all.</p>
 
 <h2>Is a free clip generator good enough for real posting?</h2>
 <p>It depends on what you are comparing against. The moment detection uses the
-same class of model the paid tools use, Google Gemini 3.1 Flash-Lite, and the
+same class of model the paid tools use, Google Gemini 3.5 Flash-Lite, and the
 reframing uses MediaPipe with a YOLOv8 fallback and a stabiliser that holds the
 camera still inside a safe zone rather than chasing every head movement. Where
 the commercial tools are ahead is caption styling: they ship more presets and
@@ -737,7 +737,7 @@ const openSourceClipper = () => ({
   lede: `OpenShorts is the open source AI clip generator: it makes video clips with AI from long videos, MIT-licensed and free to self-host with Docker (no watermark, no cap), or hosted from $${CLOUD.lowPrice}/month for ${STARTER.monthly.minutes} minutes. It is the open source alternative to Opus Clip, Klap and Vizard.`,
   tldr: [
     'OpenShorts is an MIT-licensed video clipper that runs entirely on your own hardware via Docker Compose. Source video never leaves the machine.',
-    'The stack is Python 3.11, FastAPI, faster-whisper, PySceneDetect, MediaPipe, YOLOv8, FFmpeg and Google Gemini 3.1 Flash-Lite, with a React dashboard.',
+    'The stack is Python 3.11, FastAPI, faster-whisper, PySceneDetect, MediaPipe, YOLOv8, FFmpeg and Google Gemini 3.5 Flash-Lite, with a React dashboard.',
     'It is the only open source tool in this category. Opus Clip, Klap, Vizard and Submagic are all closed-source cloud services.',
   ],
   body: `
@@ -847,7 +847,7 @@ ${pricingParagraph('how')}
 ${faqBlock([
   {
     q: 'What AI model does OpenShorts use to find viral moments?',
-    a: 'Google Gemini 3.1 Flash-Lite. It receives the word-level transcript with timestamps together with PySceneDetect scene boundaries, and returns 3 to 15 segments of 15 to 60 seconds scored on hook strength, emotional payload and whether the segment stands alone without surrounding context.',
+    a: 'Google Gemini 3.5 Flash-Lite. It receives the word-level transcript with timestamps together with PySceneDetect scene boundaries, and returns 3 to 15 segments of 15 to 60 seconds scored on hook strength, emotional payload and whether the segment stands alone without surrounding context.',
   },
   {
     q: 'How does the automatic vertical cropping work?',
@@ -862,7 +862,7 @@ ${faqBlock([
   faq: [
     {
       q: 'What AI model does OpenShorts use to find viral moments?',
-      a: 'Google Gemini 3.1 Flash-Lite, which receives the word-level transcript with timestamps together with PySceneDetect scene boundaries and returns 3 to 15 segments of 15 to 60 seconds.',
+      a: 'Google Gemini 3.5 Flash-Lite, which receives the word-level transcript with timestamps together with PySceneDetect scene boundaries and returns 3 to 15 segments of 15 to 60 seconds.',
     },
     {
       q: 'How does the automatic vertical cropping work?',
