@@ -10,8 +10,9 @@ from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel
 
-from clip_selection import (clip_count_targets, clip_duration_bounds,
-                            lookup_model_prices)
+from clip_selection import (DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_TEXT_MODEL,
+                            clip_count_targets, clip_duration_bounds,
+                            lookup_model_prices, model_unavailable)
 
 load_dotenv()
 
@@ -250,6 +251,70 @@ def _log(message: str) -> None:
         safe_text = text.encode(encoding, errors="replace").decode(encoding, errors="replace")
         stream.write(safe_text + "\n")
     stream.flush()
+
+
+# Ids Gemini has already refused in this process. The next call skips straight
+# to the replacement instead of paying for another 404.
+_retired_models = set()
+served_model = None
+
+
+def reset_model_fallback():
+    """Test hook: forget which model ids this process has seen refused."""
+    _retired_models.clear()
+    global served_model
+    served_model = None
+
+
+def configured_model(*envs, default=None):
+    """The model id to call: the first set env, else ``default``.
+
+    An id this process already saw refused (404, gone for this key) resolves
+    to ``default`` so later stages do not repeat the failure.
+    """
+    keys = envs or ("GEMINI_MODEL",)
+    chosen = ""
+    for key in keys:
+        chosen = (os.environ.get(key) or "").strip()
+        if chosen:
+            break
+    fallback = default or DEFAULT_GEMINI_MODEL
+    if not chosen or chosen in _retired_models:
+        return fallback
+    return chosen
+
+
+def _call_model(client, model, contents, config):
+    kwargs = {"model": model, "contents": contents}
+    if config is not None:
+        kwargs["config"] = config
+    return client.models.generate_content(**kwargs)
+
+
+def generate_content(client, *, model, contents, config=None, fallback=...):
+    """``client.models.generate_content``, with one retry when the id is gone.
+
+    ``fallback`` defaults to the moment-picker model. Pass
+    ``DEFAULT_GEMINI_TEXT_MODEL`` for titles, or ``None`` for a call that must
+    stay on its own model (image generation). The model that actually answered
+    is ``served_model``.
+    """
+    global served_model
+    fb = DEFAULT_GEMINI_MODEL if fallback is ... else fallback
+    if fb and model in _retired_models and model != fb:
+        model = fb
+    try:
+        response = _call_model(client, model, contents, config)
+    except Exception as e:
+        if not fb or fb == model or not model_unavailable(e):
+            raise
+        _log(f"⚠️ {model} is not available to this API key. Retrying with {fb}.")
+        _retired_models.add(model)
+        response = _call_model(client, fb, contents, config)
+        model = fb
+    served_model = model
+    return response
+
 
 SCORE_PROMPT_TEMPLATE = """
 You are a senior short-form video strategist.
@@ -586,7 +651,7 @@ def main() -> int:
     parser.add_argument("--input", dest="input_path", required=True)
     parser.add_argument("--output", dest="output_path", required=True)
     parser.add_argument("--strategy", default="structured-schema")
-    parser.add_argument("--model", default="gemini-2.5-flash")
+    parser.add_argument("--model", default=os.environ.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL)
     args = parser.parse_args()
 
     api_key = os.getenv("GEMINI_API_KEY")
@@ -616,11 +681,8 @@ def main() -> int:
     prompt = template.format(**fmt)
 
     _log(f"🤖 Gemini worker request: mode={args.mode} strategy={args.strategy} model={model_name} items={len(payload.get('windows', []))}")
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-        config=config,
-    )
+    response = generate_content(client, model=model_name, contents=prompt, config=config)
+    model_name = served_model or model_name
 
     raw_text = _get_response_text(response)
     # With response_schema the SDK returns an already-validated object; fall

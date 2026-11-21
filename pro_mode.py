@@ -542,8 +542,10 @@ def _ask_model(prompt, api_key):
     # Keep the client in a name: one built inline is closed before its call
     # is sent ("client has been closed").
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=os.environ.get("GEMINI_MODEL") or "gemini-3.1-flash-lite",
+    import gemini_worker
+    response = gemini_worker.generate_content(
+        client,
+        model=gemini_worker.configured_model(),
         contents=[prompt],
         config=genai_types.GenerateContentConfig(
             response_mime_type="application/json", response_schema=Titles))

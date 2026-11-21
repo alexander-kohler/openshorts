@@ -4,6 +4,7 @@ import re
 import pytest
 
 from clip_selection import (
+    DEFAULT_GEMINI_MODEL,
     build_transcript_windows,
     clip_count_targets,
     dedupe_overlapping,
@@ -12,6 +13,7 @@ from clip_selection import (
     snap_clip_to_words,
     compact_words,
     lookup_model_prices,
+    model_unavailable,
     trim_to_best,
     vision_segments,
 )
@@ -95,6 +97,11 @@ class TestPricing:
     def test_known_models(self):
         assert lookup_model_prices("gemini-2.5-flash") == (0.30, 2.50)
         assert lookup_model_prices("gemini-3-flash-preview") == (0.50, 3.00)
+        assert lookup_model_prices("gemini-3.5-flash-lite") == (0.30, 2.50)
+        assert lookup_model_prices("gemini-3.5-flash") == (1.50, 9.00)
+        assert lookup_model_prices(DEFAULT_GEMINI_MODEL) == (0.30, 2.50)
+        # The lite id is a longer prefix of the flash id and must not inherit its price.
+        assert lookup_model_prices("gemini-3.5-flash-lite-001") == (0.30, 2.50)
 
     def test_prefix_match_with_suffix(self):
         assert lookup_model_prices("gemini-2.5-flash-002") == (0.30, 2.50)
@@ -102,6 +109,33 @@ class TestPricing:
     def test_unknown_model_returns_none(self):
         assert lookup_model_prices("gpt-9-mega") is None
         assert lookup_model_prices(None) is None
+
+
+# The body Google returns when a new API key calls gemini-2.5-flash.
+_GONE = (
+    "404 NOT_FOUND. {'error': {'code': 404, 'message': "
+    "'This model models/gemini-2.5-flash is no longer available to new users. "
+    "Please update your code to use models/gemini-3.8-flash for the latest features "
+    "and improvements.', 'status': 'NOT_FOUND'}}"
+)
+
+
+class TestModelUnavailable:
+    def test_new_user_404_is_a_retired_model(self):
+        assert model_unavailable(_GONE)
+
+    def test_shutdown_wording_is_a_retired_model(self):
+        assert model_unavailable(
+            "404 NOT_FOUND. models/gemini-3.1-flash-lite is not found for API "
+            "version v1beta, or is not supported for generateContent.")
+
+    def test_a_missing_file_404_is_not_a_retired_model(self):
+        assert not model_unavailable("404 NOT_FOUND. File files/abc was not found.")
+
+    def test_other_api_errors_are_not_a_retired_model(self):
+        assert not model_unavailable("400 INVALID_ARGUMENT: bad request")
+        assert not model_unavailable("429 RESOURCE_EXHAUSTED")
+        assert not model_unavailable("")
 
 
 class TestCompactWords:

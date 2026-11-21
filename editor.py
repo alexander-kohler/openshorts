@@ -28,11 +28,8 @@ class EditPlan(BaseModel):
 class VideoEditor:
     def __init__(self, api_key):
         self.client = genai.Client(api_key=api_key)
-        self.model_name = (
-            os.environ.get("GEMINI_MODEL_EDITOR")
-            or os.environ.get("GEMINI_MODEL")
-            or "gemini-3.1-flash-lite"
-        )
+        self.model_name = gemini_worker.configured_model(
+            "GEMINI_MODEL_EDITOR", "GEMINI_MODEL")
 
     def upload_video(self, video_path):
         """Uploads video to Gemini File API."""
@@ -148,7 +145,8 @@ class VideoEditor:
                 response_schema=EditPlan,
             )
         try:
-            response = self.client.models.generate_content(
+            response = gemini_worker.generate_content(
+                self.client,
                 model=self.model_name,
                 contents=[video_file_obj, prompt],
                 config=config,
@@ -157,7 +155,8 @@ class VideoEditor:
             if getattr(config, "media_resolution", None) is None:
                 raise
             print(f"⚠️ media_resolution=low rejected ({e}); retrying with defaults...")
-            response = self.client.models.generate_content(
+            response = gemini_worker.generate_content(
+                self.client,
                 model=self.model_name,
                 contents=[video_file_obj, prompt],
                 config=types.GenerateContentConfig(
@@ -238,7 +237,8 @@ class VideoEditor:
         """
 
         print("🤖 Asking Gemini for Remotion effects config...")
-        response = self.client.models.generate_content(
+        response = gemini_worker.generate_content(
+            self.client,
             model=self.model_name,
             contents=[video_file_obj, prompt],
             config=types.GenerateContentConfig(
@@ -434,7 +434,8 @@ class VideoEditor:
         Output JSON only: {{"filter_string": "..."}}
         """
         try:
-            response = self.client.models.generate_content(
+            response = gemini_worker.generate_content(
+                self.client,
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(response_mime_type="application/json"),

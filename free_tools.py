@@ -852,7 +852,7 @@ def _gemini_key():
 
 
 METADATA_MODEL = (os.environ.get("FREE_TOOLS_GEMINI_MODEL")
-                  or os.environ.get("GEMINI_MODEL_THUMBNAIL") or "gemini-3.7-flash")
+                  or os.environ.get("GEMINI_MODEL_THUMBNAIL") or "gemini-3.8-flash")
 
 
 def _thinking_config(types):
@@ -866,9 +866,12 @@ def _generate(prompt: str) -> dict:
     from google import genai
     from google.genai import types
     client = genai.Client(api_key=_gemini_key())
-    resp = client.models.generate_content(
+    import gemini_worker
+    resp = gemini_worker.generate_content(
+        client,
         model=METADATA_MODEL,
         contents=[prompt],
+        fallback=gemini_worker.DEFAULT_GEMINI_TEXT_MODEL,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             # Thinking tokens count against max_output_tokens on the 3.x

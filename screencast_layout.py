@@ -372,13 +372,14 @@ def detect_content_ranges(video_path, scenes, fps):
         print("   ⚠️ Screen check needs GEMINI_API_KEY.")
         return None
 
-    model_name = os.environ.get("GEMINI_MODEL") or 'gemini-3.1-flash-lite'
     asked = shots_to_ask(scenes)
     print(f"   🔎 Screen check on {len(asked)} shot(s)…")
     try:
         from google import genai
         from google.genai import types as genai_types
         import gemini_worker
+
+        model_name = gemini_worker.configured_model()
 
         frames = _shot_frames(video_path, scenes, asked)
         keep = [(i, jpg) for i, jpg in zip(asked, frames) if jpg]
@@ -390,7 +391,8 @@ def detect_content_ranges(video_path, scenes, fps):
             parts.append(f"Shot {n}:")
             parts.append(genai_types.Part.from_bytes(data=jpg, mime_type="image/jpeg"))
         client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
+        response = gemini_worker.generate_content(
+            client,
             model=model_name,
             contents=parts + [gemini_worker.SHOT_CONTENT_PROMPT],
             config=genai_types.GenerateContentConfig(

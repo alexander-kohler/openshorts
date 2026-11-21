@@ -2356,7 +2356,9 @@ def _run_gemini_stage(client, model_name, prompt, schema):
         try:
             if use_local:
                 return llm_backend.generate_json(prompt, schema, model=model_name)
-            response = client.models.generate_content(model=model_name, contents=prompt, config=config)
+            response = gemini_worker.generate_content(
+                client, model=model_name, contents=prompt, config=config)
+            model_name = gemini_worker.served_model or model_name
             # Policy blocks are deterministic — retrying only burns quota and
             # time, and the user deserves the real reason instead of a generic
             # "empty response" (prod 23-jul: PROHIBITED_CONTENT on every try).
@@ -2459,7 +2461,7 @@ def get_viral_clips(transcript_result, video_duration, viewer_clips=None):
                   "(set it, or point LLM_BASE_URL at an OpenAI-compatible server).")
             return None
         client = genai.Client(api_key=api_key)
-        model_name = os.environ.get("GEMINI_MODEL") or 'gemini-3.1-flash-lite'
+        model_name = gemini_worker.configured_model()
     print(f"\U0001f916  Model: {model_name} | language: {language}")
 
     # Full word list — ground truth for snapping cut points.
@@ -2611,6 +2613,8 @@ def get_viral_clips(transcript_result, video_duration, viewer_clips=None):
         # Aggregate cost across both passes.
         cost_analysis = None
         if costs:
+            if not llm_backend.active():
+                model_name = gemini_worker.served_model or model_name
             cost_analysis = {
                 "input_tokens": sum(c.get("input_tokens", 0) for c in costs),
                 "output_tokens": sum(c.get("output_tokens", 0) for c in costs),
@@ -2749,8 +2753,9 @@ def _visual_pass(client, model_name, video_path, duration, language,
             response_mime_type="application/json",
             response_schema=gemini_worker.VisualResponse,
         )
-        response = client.models.generate_content(
-            model=model_name, contents=[file_upload, prompt], config=config)
+        response = gemini_worker.generate_content(
+            client, model=model_name, contents=[file_upload, prompt], config=config)
+        model_name = gemini_worker.served_model or model_name
         gemini_worker.raise_if_blocked(response)
         parsed = json.loads(response.text)
         clean = []
@@ -2791,7 +2796,7 @@ def get_visual_clips(video_path, video_duration, language="en", viewer_clips=Non
             print("❌ Error: GEMINI_API_KEY not found.")
         return None
     client = genai.Client(api_key=api_key)
-    model_name = os.environ.get("GEMINI_MODEL") or 'gemini-3.1-flash-lite'
+    model_name = gemini_worker.configured_model()
 
     # The vision path has no scoring windows to derive a count from, so the
     # env targets (user request) apply directly over the classic 3-15.
@@ -2856,6 +2861,7 @@ def get_visual_clips(video_path, video_duration, language="en", viewer_clips=Non
         if not clean:
             print("⚠️ Vision pass returned no usable clips.")
             return None
+        model_name = gemini_worker.served_model or model_name
         cost = _sum_costs(costs, model_name)
         if cost:
             print(f"💰 Vision cost ({model_name}): ${cost.get('total_cost', 0):.6f}")

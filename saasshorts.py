@@ -39,7 +39,16 @@ DEFAULT_VOICES = {
 }
 
 
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL_SAAS") or os.environ.get("GEMINI_MODEL") or "gemini-3.1-flash-lite"
+def _gemini(client, contents, config=None):
+    """One Gemini call. GEMINI_MODEL_SAAS wins, then GEMINI_MODEL, then the
+    current moment-picker default. A 404 for a retired id retries on that default."""
+    import gemini_worker
+    return gemini_worker.generate_content(
+        client,
+        model=gemini_worker.configured_model("GEMINI_MODEL_SAAS", "GEMINI_MODEL"),
+        contents=contents,
+        config=config,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -102,10 +111,10 @@ Return a comprehensive JSON research report:
 
 Be thorough. Use REAL data from your search results, not made-up information."""
 
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=[prompt],
-        config=types.GenerateContentConfig(
+    response = _gemini(
+        client,
+        [prompt],
+        types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())],
         ),
     )
@@ -363,10 +372,10 @@ Return a JSON object:
 IMPORTANT: Use REAL pain points from user reviews when available. Real frustrations make the best UGC content.
 Include 5-8 pain points, 4-6 emotional hooks, and 4+ viral angles."""
 
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=[prompt],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    response = _gemini(
+        client,
+        [prompt],
+        types.GenerateContentConfig(response_mime_type="application/json"),
     )
 
     raw = response.text
@@ -545,10 +554,10 @@ RULES:
 - Example female: "a 26 year old attractive european woman, light brown wavy hair, wearing a white tank top, natural minimal makeup, friendly face"
 - Example male: "a 29 year old european man, short dark hair, light stubble, wearing a navy t-shirt, smart casual look" """
 
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=[prompt],
-        config=types.GenerateContentConfig(
+    response = _gemini(
+        client,
+        [prompt],
+        types.GenerateContentConfig(
             response_mime_type="application/json",
             max_output_tokens=8192,
         ),

@@ -13,8 +13,17 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 # but titles are the one place where the creative gap between lite and flash
 # shows, and ten titles per video cost cents either way. The image model
 # stays on gemini-3.1-flash-image; the text models cannot draw.
-TEXT_MODEL = os.environ.get("GEMINI_MODEL_THUMBNAIL") or "gemini-3.7-flash"
+TEXT_MODEL = os.environ.get("GEMINI_MODEL_THUMBNAIL") or "gemini-3.8-flash"
 IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL") or "gemini-3.1-flash-image"
+
+
+def _text_generate(client, contents, config=None):
+    """A thumbnail text call. A retired text model is retried on Gemini 3.8 Flash,
+    never on the moment-picker flash-lite."""
+    import gemini_worker
+    return gemini_worker.generate_content(
+        client, model=TEXT_MODEL, contents=contents, config=config,
+        fallback=gemini_worker.DEFAULT_GEMINI_TEXT_MODEL)
 
 # Frames sent with the transcript instead of the whole video. Gemini bills
 # video at ~300 tokens/s, so an hour is ~1M tokens for what is a text task;
@@ -114,10 +123,10 @@ OUTPUT JSON:
 }}"""
 
     print("🤖 [Thumbnail] Brainstorming titles...")
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=frames + [brainstorm_prompt],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    response = _text_generate(
+        client,
+        frames + [brainstorm_prompt],
+        types.GenerateContentConfig(response_mime_type="application/json"),
     )
     try:
         draft = _parse_json(response.text)
@@ -163,10 +172,10 @@ OUTPUT JSON:
 }}"""
 
     print("🧐 [Thumbnail] Scoring titles...")
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=[critic_prompt],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    response = _text_generate(
+        client,
+        [critic_prompt],
+        types.GenerateContentConfig(response_mime_type="application/json"),
     )
     try:
         picked = _parse_json(response.text)
@@ -231,12 +240,10 @@ OUTPUT JSON:
     "language": "ISO 639-1 code of the language the titles are written in"
 }}"""
 
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=[prompt],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json"
-        )
+    response = _text_generate(
+        client,
+        [prompt],
+        types.GenerateContentConfig(response_mime_type="application/json"),
     )
 
     try:
@@ -403,10 +410,10 @@ Per concept give:
 OUTPUT JSON:
 {{"concepts": [{{"text": "...", "text_position": "left", "text_color": "yellow", "scene": "...", "why": "..."}}, ...]}}"""
 
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=[prompt],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    response = _text_generate(
+        client,
+        [prompt],
+        types.GenerateContentConfig(response_mime_type="application/json"),
     )
     try:
         concepts = _parse_json(response.text).get("concepts", [])
@@ -626,13 +633,16 @@ Style: high contrast, saturated colours, crisp subject separation, cinematic lig
                    "body type. Photorealistic, like a photo of them; do not idealize, slim, rejuvenate or "
                    "stylize them. Expression may change slightly but must stay natural and true to their face.")
 
-    response = client.models.generate_content(
+    import gemini_worker
+    response = gemini_worker.generate_content(
+        client,
         model=IMAGE_MODEL,
         contents=reference_images + [prompt],
         config=types.GenerateContentConfig(
             response_modalities=["TEXT", "IMAGE"],
             image_config=types.ImageConfig(aspect_ratio="16:9", image_size="2K"),
         ),
+        fallback=None,
     )
     if not response.parts:
         cand = (response.candidates or [None])[0]
@@ -776,10 +786,7 @@ REQUIREMENTS:
 OUTPUT: Return ONLY the description text (no JSON wrapper, no markdown code blocks). The description should be ready to paste directly into YouTube."""
 
     print("🤖 [Thumbnail] Generating YouTube description with chapters...")
-    response = client.models.generate_content(
-        model=TEXT_MODEL,
-        contents=[prompt],
-    )
+    response = _text_generate(client, [prompt])
 
     description = response.text.strip()
     # Clean up any accidental markdown wrappers
